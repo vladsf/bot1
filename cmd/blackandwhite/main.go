@@ -34,7 +34,7 @@ type Stats struct {
 }
 
 var tempDir = getEnv("TEMP_DIR", "tmp")
-var apiToken = getEnv("API_TOKEN", "")
+var apiToken = getEnv("API_TOKEN", "changeme")
 var requestCounter uint64
 
 func main() {

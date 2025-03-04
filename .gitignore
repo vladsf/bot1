@@ -1,41 +1,28 @@
 # Go-specific
-./bot1
-./blackandwhite
-bin/                # Compiled binaries
-pkg/                # Package dependencies (often managed by Go modules)
-vendor/             # Vendor dependencies (if you're not using Go modules or prefer vendor)
+/bot1
+/blackandwhite
+bin/
+pkg/
+vendor/
 
 # Environment variables and configuration
 .env
 
 # Logs and temporary files
-*.log               # Log files
-*.tmp               # Temporary files
-temp/               # Temporary directory
-*.swp               # Swap files (from editors like Vim)
-.DS_Store          # macOS Finder store files
+*.log
+*.tmp
+temp/
+*.swp
+.DS_Store
 
 # IDE-specific files
-.idea/              # JetBrains IDE settings
-.vscode/            # VS Code settings
-*.iml               # IntelliJ IDEA module files
-
-# OS-specific files
-.cache              # Cache directories
-__pycache__/        # Python cache files
-.git/refs/         # Prevent accidental pushing of local refs
-.gitignore         # This file itself (good practice to include it)
-
-# Docker-related (if applicable)
-.dockerignore       # Docker ignore file
+.idea/
+.vscode/
+*.iml
 
 # Testing-related
 _test/             # Test data or temporary files generated during tests
 
 # Other
-.DS_Store          # macOS desktop services store
-*.exe              # Windows executables
-*.DS_Store        # macOS Desktop Services Store
-.AppleDouble       # macOS resource forks
 Thumbs.db          # Windows thumbnail cache
 

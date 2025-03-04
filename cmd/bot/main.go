@@ -43,7 +43,13 @@ func main() {
 	}
 
 	b.Handle("/hello", func(c tele.Context) error {
-		return c.Send("Hello, I can gray scale your photos!")
+		user := c.Sender()
+		if user != nil {
+			welcomeMessage := fmt.Sprintf("Hello, %s! I can gray scale your photos!", user.FirstName)
+			return c.Send(welcomeMessage)
+		} else {
+			return c.Send("Hello, I can gray scale your photos!")
+		}
 	})
 
 	b.Handle("/help", func(c tele.Context) error {

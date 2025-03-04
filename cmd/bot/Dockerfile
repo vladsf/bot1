@@ -1,5 +1,5 @@
 # Use the official Golang image to build the binary
-FROM golang:1.23 as builder
+FROM golang:1.23 AS builder
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -20,7 +20,7 @@ RUN go build -o bot1 main.go
 FROM gcr.io/distroless/base-debian12
 
 # Copy the Pre-built binary file from the previous stage
-COPY --from=builder /app/bot1 /app/telegrambot
+COPY --from=builder /app/bot1 /app/bot1
 
 # Set the working directory
 WORKDIR /app

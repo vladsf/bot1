@@ -1,0 +1,14 @@
+[Unit]
+Description=My Telegram Bot1
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/bot1
+ExecStart=/opt/bot1/bot1
+Restart=on-failure
+RestartSec=60
+EnvironmentFile=/opt/bot1/.env
+
+[Install]
+WantedBy=multi-user.target

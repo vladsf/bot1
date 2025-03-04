@@ -6,8 +6,7 @@ pkg/                # Package dependencies (often managed by Go modules)
 vendor/             # Vendor dependencies (if you're not using Go modules or prefer vendor)
 
 # Environment variables and configuration
-.env                # Environment variables (never commit this!)
-config.json         # Configuration files (if they contain sensitive data)
+.env
 
 # Logs and temporary files
 *.log               # Log files
@@ -39,3 +38,4 @@ _test/             # Test data or temporary files generated during tests
 *.DS_Store        # macOS Desktop Services Store
 .AppleDouble       # macOS resource forks
 Thumbs.db          # Windows thumbnail cache
+

@@ -6,12 +6,12 @@ This Go project sets up an HTTP microservice that accepts an image file via a PO
 
 - Go 1.23 or later
 
-## Setup
+## 
 
-1. **Initialize the project:**
+1. **Build and push to docker:**
 
     ```sh
-    go mod init blackandwhite
+    make all
     ```
 
 2. **Install dependencies:**
@@ -21,7 +21,7 @@ This Go project sets up an HTTP microservice that accepts an image file via a PO
     go get github.com/google/uuid
     ```
 
-3. **Build and run the server:**
+3. **Build and run the server locally:**
 
     ```sh
     go build -o blackandwhite main.go
@@ -56,16 +56,9 @@ Response:
 ### Send Metadata and Retrieve the Image
 
 ```sh
-curl -X GET -H "Content-Type: application/json" -d '{
-  "id": "your-unique-image-id",
-  "metadata": {
-    "exampleKey": "exampleValue"
-  }
-}' http://localhost:8080/image
+curl -X GET -o output.jpg  http://localhost:8080/image?id=your-unique-image-id
 ```
 
 The response will be the black and white image.
 
-## Usage
-
-You can modify the `convertToBlackAndWhite` function to accept different `io.Reader` and `io.Writer` sources as needed. The `getImageHandler` re-associates the image with the provided metadata and returns the resulting image.
+## Authorization

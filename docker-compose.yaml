@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  blackandwhite:
+    image: blackandwhite:latest
+    build:
+      context: ./cmd/blackandwhite
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    networks:
+      - bot-network
+
+  telegram-bot:
+    image: bot1:latest
+    build:
+      context: ./cmd/bot
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge

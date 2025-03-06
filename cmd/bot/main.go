@@ -9,24 +9,52 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"sync"
+	"syscall"
 	"time"
 
 	tele "gopkg.in/telebot.v4"
 	middleware "gopkg.in/telebot.v4/middleware"
 )
 
-var Version string
+var (
+	Version string
+	Users   sync.Map
+)
 
 type Stats struct {
 	TotalRequests  uint64 `json:"total_requests"`
 	TempFilesCount int    `json:"temp_files_count"`
 }
 
-var imageProcessingServerURL = getEnv("IMAGE_PROCESSING_SERVER_URL", "http://localhost:8080")
-var imageProcessingAPIToken = getEnv("IMAGE_PROCESSING_API_TOKEN", "")
+type User struct {
+	Username  string    `json:"username"`
+	IsBot     bool      `json:"is_bot"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+var (
+	imageProcessingServerURL = getEnv("IMAGE_PROCESSING_SERVER_URL", "http://localhost:8080")
+	imageProcessingAPIToken  = getEnv("IMAGE_PROCESSING_API_TOKEN", "")
+	usersFilePath            = "users.json"
+)
 
 func main() {
+	loadUsers()
+
+	// Create a channel to receive signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGTERM)
+
+	// Start a goroutine to handle the signal
+	go func() {
+		<-sigChan
+		saveUsers()
+		os.Exit(0)
+	}()
+
 	pref := tele.Settings{
 		Token:  os.Getenv("TG_BOT_TOKEN"),
 		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
@@ -64,6 +92,7 @@ func main() {
 		user := c.Sender()
 		if user != nil {
 			welcomeMessage := fmt.Sprintf("Welcome, %s!", user.FirstName)
+			storeUser(user)
 			return c.Send(welcomeMessage)
 		} else {
 			return c.Send("Welcome!")
@@ -110,7 +139,69 @@ func main() {
 	})
 
 	log.Println("Bot started.")
+	defer saveUsers()
 	b.Start()
+}
+
+func storeUser(user *tele.User) {
+	if _, exists := Users.Load(user.ID); !exists {
+		newUser := User{
+			Username:  user.Username,
+			IsBot:     user.IsBot,
+			CreatedAt: time.Now(),
+		}
+		Users.Store(user.ID, newUser)
+	}
+}
+
+func loadUsers() {
+	file, err := os.Open(usersFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		log.Fatalf("Failed to open users file: %v", err)
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	users := make(map[int64]User)
+	if err := decoder.Decode(&users); err != nil {
+		log.Fatalf("Failed to decode users file: %v", err)
+	}
+
+	for id, user := range users {
+		Users.Store(id, user)
+	}
+	log.Println("Users loaded from file.")
+}
+
+func saveUsers() {
+	file, err := os.Create(usersFilePath)
+	if err != nil {
+		log.Fatalf("Failed to create users file: %v", err)
+	}
+	defer file.Close()
+
+	users := make(map[int64]User)
+	Users.Range(func(key, value interface{}) bool {
+		id, ok := key.(int64)
+		if !ok {
+			return false
+		}
+		user, ok := value.(User)
+		if !ok {
+			return false
+		}
+		users[id] = user
+		return true
+	})
+
+	encoder := json.NewEncoder(file)
+	if err := encoder.Encode(users); err != nil {
+		log.Fatalf("Failed to encode users to file: %v", err)
+	}
+	log.Println("Users saved to file.")
 }
 
 func getStats() (Stats, error) {

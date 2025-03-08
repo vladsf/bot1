@@ -108,13 +108,18 @@ func main() {
 	})
 
 	b.Handle("/annc", func(c tele.Context) error {
-		Users.Range(func(key, value interface{}) bool {
-			id, _ := key.(int64)
-			user, _ := value.(User)
-			recipient := &tele.User{ID: id, Username: user.Username, FirstName: user.Username, IsBot: user.IsBot}
-			b.Send(recipient, "This is announce")
-			return true
-		})
+Users.Range(func(key, value interface{}) bool {
+		id, _ := key.(int64)
+		user, _ := value.(User)
+		recipient := &tele.User{ID: id, Username: user.Username, FirstName: user.Username, IsBot: user.IsBot}
+		err := b.Send(recipient, "This is announce")
+		if err != nil {
+			log.Printf("Failed to send announcement to user %d: %v", id, err)
+			// Consider adding retry logic or other error handling here
+		}
+		time.Sleep(time.Millisecond * 100) // Add a delay to avoid rate limiting
+		return true
+	})
 		return c.Send("Announcement sent to all users!")
 	})
 

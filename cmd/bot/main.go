@@ -107,6 +107,17 @@ func main() {
 		return c.Send(fmt.Sprintf("Stats: %d reqs, %d files", stats.TotalRequests, stats.TempFilesCount))
 	})
 
+	b.Handle("/annc", func(c tele.Context) error {
+		Users.Range(func(key, value interface{}) bool {
+			id, _ := key.(int64)
+			user, _ := value.(User)
+			recipient := &tele.User{ID: id, Username: user.Username, FirstName: user.Username, IsBot: user.IsBot}
+			b.Send(recipient, "This is announce")
+			return true
+		})
+		return c.Send("Announcement sent to all users!")
+	})
+
 	b.Handle(tele.OnText, func(c tele.Context) error {
 		// Handle all text messages that are not commands here, if needed.
 		// If you don't need special handling, you can leave it empty or just have a default response.

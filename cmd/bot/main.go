@@ -107,6 +107,26 @@ func main() {
 		return c.Send(fmt.Sprintf("Stats: %d reqs, %d files", stats.TotalRequests, stats.TempFilesCount))
 	})
 
+	b.Handle("/annc", func(c tele.Context) error {
+		message := c.Message().Payload
+		if message == "" {
+			return c.Send("Please provide a message for the announcement.")
+		}
+		Users.Range(func(key, value interface{}) bool {
+			id, _ := key.(int64)
+			user, _ := value.(User)
+			recipient := &tele.User{ID: id, Username: user.Username, FirstName: user.Username, IsBot: user.IsBot}
+			b.Send(recipient, message)
+			if err != nil {
+				log.Printf("Failed to send announcement to user %d: %v", id, err)
+				// Consider adding retry logic or other error handling here
+			}
+			time.Sleep(time.Millisecond * 100) // Add a delay to avoid rate limiting
+			return true
+		})
+		return c.Send("Announcement sent to all users!")
+	})
+
 	b.Handle(tele.OnText, func(c tele.Context) error {
 		// Handle all text messages that are not commands here, if needed.
 		// If you don't need special handling, you can leave it empty or just have a default response.

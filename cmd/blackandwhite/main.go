@@ -154,17 +154,86 @@ func convertToBlackAndWhite(input io.Reader, output io.Writer) error {
 		return fmt.Errorf("failed to decode image: %v", err)
 	}
 
-	// Convert the image to grayscale
-	grayImg := imaging.Grayscale(img)
+	// 1. Contrast Stretch (Normalization)
+	// This pulls the text out of the "gray" mud before we process it.
+	normalized := imaging.Grayscale(img)
+	normalized = imaging.AdjustContrast(normalized, 20) // Slight boost
+	normalized = imaging.Sharpen(normalized, 0.5)       // Sharpen edges for cleaner text
+
+	// 2. Convert to strict Gray type
+	bounds := normalized.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+	grayImg := image.NewGray(bounds)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			grayImg.Set(x+bounds.Min.X, y+bounds.Min.Y, normalized.At(x+bounds.Min.X, y+bounds.Min.Y))
+		}
+	}
+
+	// 3. Build Integral Image
+	integral := make([][]int64, width)
+	for i := range integral {
+		integral[i] = make([]int64, height)
+	}
+
+	for y := 0; y < height; y++ {
+		var rowSum int64 = 0
+		for x := 0; x < width; x++ {
+			rowSum += int64(grayImg.GrayAt(x+bounds.Min.X, y+bounds.Min.Y).Y)
+			if y == 0 {
+				integral[x][y] = rowSum
+			} else {
+				integral[x][y] = integral[x][y-1] + rowSum
+			}
+		}
+	}
+
+	// 4. Adaptive Thresholding
+	bwImg := image.NewGray(bounds)
+
+	s := 21 // Window size (radius)
+	c := int64(15) // Toner saving offset (higher = more white)
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			x1, x2 := max(0, x-s), min(width-1, x+s)
+			y1, y2 := max(0, y-s), min(height-1, y+s)
+
+			count := int64((x2 - x1 + 1) * (y2 - y1 + 1))
+			sum := integral[x2][y2]
+			if x1 > 0 {
+				sum -= integral[x1-1][y2]
+			}
+			if y1 > 0 {
+				sum -= integral[x2][y1-1]
+			}
+			if x1 > 0 && y1 > 0 {
+				sum += integral[x1-1][y1-1]
+			}
+
+			localMean := sum / count
+			currentPixel := int64(grayImg.GrayAt(x+bounds.Min.X, y+bounds.Min.Y).Y)
+
+			var finalVal uint8 = 255
+			// If pixel is significantly darker than its neighborhood mean
+			if currentPixel < (localMean - c) {
+				finalVal = 0
+			}
+			bwImg.SetGray(x+bounds.Min.X, y+bounds.Min.Y, color.Gray{Y: finalVal})
+		}
+	}
 
 	// Encode and save the resulting image
-	err = jpeg.Encode(output, grayImg, nil)
+	err = jpeg.Encode(output, bwImg, nil)
 	if err != nil {
 		return fmt.Errorf("failed to encode and save image: %v", err)
 	}
 
 	return nil
 }
+
+func min(a, b int) int { if a < b { return a }; return b }
+func max(a, b int) int { if a > b { return a }; return b }
 
 func jsonResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"image/color"
 	"io"
 	"log"
 	"net/http"

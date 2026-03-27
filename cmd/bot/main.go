@@ -270,31 +270,25 @@ func processImage(filePath string) (io.Reader, error) {
 		return nil, fmt.Errorf("failed to close writer: %v", err)
 	}
 
-	// Create a new HTTP request to send the form data
-	req, err := http.NewRequest("POST", imageProcessingServerURL+"/image", body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+	// Capture the bytes so we can replay them
+	bodyBytes := body.Bytes()
+	headers := map[string]string{
+		"Content-Type": writer.FormDataContentType(),
 	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	// Add the API token to the request header if it's set
 	if imageProcessingAPIToken != "" {
-		req.Header.Set("Authorization", "Bearer "+imageProcessingAPIToken)
+		headers["Authorization"] = "Bearer " + imageProcessingAPIToken
 	}
 
-	// Send the request to the server
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	resp, err := client.Do(req)
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	// Submit image for processing
+	resp, err := doWithRetry(client, "POST", imageProcessingServerURL+"/image", headers, func() io.ReadCloser {
+		return io.NopCloser(bytes.NewReader(bodyBytes))
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %v", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("server returned non-200 status: %v", resp.Status)
-	}
 
 	// Parse the response to get the image ID
 	var result struct {
@@ -309,23 +303,16 @@ func processImage(filePath string) (io.Reader, error) {
 
 	// Request the processed image using the image ID
 	imageURL := fmt.Sprintf("%s/image?id=%s", imageProcessingServerURL, result.ID)
-	req, err = http.NewRequest("GET", imageURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
-	}
-	if imageProcessingAPIToken != "" {
-		req.Header.Set("Authorization", "Bearer "+imageProcessingAPIToken)
-	}
 
-	resp, err = client.Do(req)
+	// We pass nil for bodyProvider because GET doesn't need a body
+	resp, err = doWithRetry(client, "GET", imageURL, headers, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %v", err)
+		return nil, err
 	}
-	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("server returned non-200 status: %v", resp.Status)
 	}
+	defer resp.Body.Close()
 
 	// Read the response body into a buffer
 	var buf bytes.Buffer
@@ -342,4 +329,51 @@ func getEnv(key, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+// bodyProvider allows us to create a fresh reader for every retry attempt
+type bodyProvider func() io.ReadCloser
+
+func doWithRetry(client *http.Client, method, url string, headers map[string]string, getBody bodyProvider) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+
+	maxRetries := 5
+	initialBackoff := 500 * time.Millisecond
+
+	for i := 0; i < maxRetries; i++ {
+		var body io.ReadCloser
+		if getBody != nil {
+			body = getBody()
+		}
+
+		req, err := http.NewRequest(method, url, body)
+		if err != nil {
+			return nil, err
+		}
+
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+
+		resp, err = client.Do(req)
+
+		// Retry if: network error OR server-side error (5xx)
+		if err == nil && resp.StatusCode < 500 && resp.StatusCode != http.StatusNotFound {
+			return resp, nil
+		}
+
+		if resp != nil {
+			resp.Body.Close()
+		}
+
+		if i < maxRetries-1 {
+			time.Sleep(initialBackoff * (1 << i))
+		}
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("after %d attempts: %w", maxRetries, err)
+	}
+	return nil, fmt.Errorf("after %d attempts: server returned %s", maxRetries, resp.Status)
 }

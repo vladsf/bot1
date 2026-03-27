@@ -283,7 +283,9 @@ func processImage(filePath string) (io.Reader, error) {
 	}
 
 	// Send the request to the server
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %v", err)
